@@ -1,0 +1,95 @@
+#!/bin/bash
+set -euo pipefail
+
+usage() {
+  cat << EOF
+Usage: gh-open [OPTIONS] [TARGET]
+
+Open GitHub repository files, commits, or directories in browser.
+
+OPTIONS:
+  -h, --help    Show this help message
+
+TARGETS:
+  (none)           Open current directory in browser
+  <commit-sha>     Open commit page
+  <commit>:<file>  Open file at specific commit
+  <commit>:<file>:<line>  Open file at specific commit and line
+  <file>           Open file at current HEAD
+  <file>:<line>    Open file at current HEAD and line
+
+EXAMPLES:
+  gh-open                    # Open current directory
+  gh-open abc1234            # Open commit abc1234
+  gh-open abc1234:README.md  # Open README.md at commit abc1234
+  gh-open README.md:10       # Open README.md at line 10
+EOF
+  exit 1
+}
+
+open_url() {
+  echo "Opening: $1"
+  if command -v open >/dev/null 2>&1; then
+    open "$1"             # macOS
+  elif command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "$1"         # Linux
+  else
+    echo "Please open this URL manually: $1"
+  fi
+}
+
+# Get repo info
+REPO_URL=$(gh repo view --json url -q .url)
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name)
+CURRENT_REF=$(git rev-parse --abbrev-ref HEAD || echo "$DEFAULT_BRANCH")
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+INPUT="${1:-}"
+
+# Check for help flags
+if [[ "$INPUT" == "-h" || "$INPUT" == "--help" ]]; then
+  usage
+fi
+
+if [[ -z "${INPUT}" ]]; then
+  # Case 1: Current directory
+  REL_PATH=${PWD#"$REPO_ROOT"/}
+  FILE_URL="$REPO_URL/blob/$CURRENT_REF/$REL_PATH"
+  open_url "$FILE_URL"
+elif [[ "$INPUT" =~ ^[0-9a-f]{7,40}$ ]]; then
+  # Case 2: Just a commit SHA
+  COMMIT_URL="$REPO_URL/commit/$INPUT"
+  open_url "$COMMIT_URL"
+elif [[ "$INPUT" =~ ^([0-9a-f]{7,40}):(.*)$ ]]; then
+  # Case 2: Commit:file[:line]
+  COMMIT="${BASH_REMATCH[1]}"
+  REST="${BASH_REMATCH[2]}"
+  FILE_PATH="${REST%%:*}"
+  LINE_PART="${REST#*:}"
+
+  if [[ "$FILE_PATH" == "$LINE_PART" ]]; then
+    LINE_FRAGMENT=""
+  else
+    LINE_FRAGMENT="#L$LINE_PART"
+  fi
+
+  FULL_PATH=$(realpath "$FILE_PATH")
+  REL_PATH=${FULL_PATH#"$REPO_ROOT"/}
+  FILE_URL="$REPO_URL/blob/$COMMIT/$REL_PATH$LINE_FRAGMENT"
+  open_url "$FILE_URL"
+else
+  # Case 3: path[:line] at current HEAD
+  FILE_PATH="${INPUT%%:*}"
+  LINE_PART="${INPUT#*:}"
+
+  if [[ "$FILE_PATH" == "$LINE_PART" ]]; then
+    LINE_FRAGMENT=""
+  else
+    LINE_FRAGMENT="#L$LINE_PART"
+  fi
+
+  FULL_PATH=$(realpath "$FILE_PATH")
+  REL_PATH=${FULL_PATH#"$REPO_ROOT"/}
+  FILE_URL="$REPO_URL/blob/$CURRENT_REF/$REL_PATH$LINE_FRAGMENT"
+  open_url "$FILE_URL"
+fi
