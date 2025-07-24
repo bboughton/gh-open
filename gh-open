@@ -54,6 +54,9 @@ fi
 if [[ -z "${INPUT}" ]]; then
   # Case 1: Current directory
   REL_PATH=${PWD#"$REPO_ROOT"/}
+  if [[ "$REL_PATH" == "$PWD" ]]; then
+    REL_PATH=""
+  fi
   FILE_URL="$REPO_URL/blob/$CURRENT_REF/$REL_PATH"
   open_url "$FILE_URL"
 elif [[ "$INPUT" =~ ^[0-9a-f]{7,40}$ ]]; then
@@ -75,6 +78,9 @@ elif [[ "$INPUT" =~ ^([0-9a-f]{7,40}):(.*)$ ]]; then
 
   FULL_PATH=$(realpath "$FILE_PATH")
   REL_PATH=${FULL_PATH#"$REPO_ROOT"/}
+  if [[ "$REL_PATH" == "$PWD" ]]; then
+    REL_PATH=""
+  fi
   FILE_URL="$REPO_URL/blob/$COMMIT/$REL_PATH$LINE_FRAGMENT"
   open_url "$FILE_URL"
 else
@@ -90,6 +96,9 @@ else
 
   FULL_PATH=$(realpath "$FILE_PATH")
   REL_PATH=${FULL_PATH#"$REPO_ROOT"/}
+  if [[ "$REL_PATH" == "$PWD" ]]; then
+    REL_PATH=""
+  fi
   FILE_URL="$REPO_URL/blob/$CURRENT_REF/$REL_PATH$LINE_FRAGMENT"
   open_url "$FILE_URL"
 fi
